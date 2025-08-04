@@ -15,9 +15,9 @@ router.get("/user/otp", authControllerEjs.otpView);
 router.post("/create/otp", authControllerEjs.verifyOtpCreate);
 
 router.post("/forgot-password", authControllerEjs.resetPasswordLink);
-router.get("/reset-password/:id/:token",authControllerEjs.passwordlinkview);
+router.get("/reset-password/:id/:token",authControllerEjs.passwordLinkView);
 
-router.post("/reset-password/:id/:token", resetPassword);
+router.post("/reset-password/:id/:token", authControllerEjs.resetPassword);
 
-router.get("/reset-success", showResetSuccessPage);
+// router.get("/reset-success", authControllerEjs.showResetSuccessPage);
 module.exports = router;
