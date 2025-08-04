@@ -3,39 +3,42 @@ const jwt = require("jsonwebtoken");
 const Auth = require("../model/authModel");
 const EmailVerifyModel = require("../model/otpModel");
 const sendEmailVerificationOTP = require("../helper/sendEmailverification");
-const StatusCode = require("../helper/status");
 const nodemailer = require("nodemailer");
-const { transporter } = require("../config/emailConfig");
+const {
+  registerSchema,
+  loginSchema,
+  updatePasswordSchema,
+  verifyOtpSchema,
+} = require("../../validators/authValidator");
 class AuthController {
   // Register User
   async authRegister(req, res) {
     try {
-      const { name, email, password, confirmPassword, address } = req.body;
+      // 1. Validate request body using Joi
+      const { error, value } = registerSchema.validate(req.body, {
+        abortEarly: false,
+      });
+
+      if (error) {
+        return res.status(400).json({
+          status: false,
+          message: "All fields are require",
+          errors: error.details.map((err) => err.message),
+        });
+      }
+
+      const { name, email, password, address } = value;
+
+      // 2. Check if profile image was uploaded
       const profileImage = req.file;
-
-      // 1. Validation
-      if (
-        !name ||
-        !email ||
-        !password ||
-        !confirmPassword ||
-        !address ||
-        !profileImage
-      ) {
+      if (!profileImage) {
         return res.status(400).json({
           status: false,
-          message: "All fields are required, including profile image.",
+          message: "Profile image is required.",
         });
       }
 
-      if (password !== confirmPassword) {
-        return res.status(400).json({
-          status: false,
-          message: "Password and Confirm Password do not match.",
-        });
-      }
-
-      // 2. Check for existing user
+      // 3. Check for existing user
       const existingUser = await Auth.findOne({ email });
       if (existingUser) {
         return res.status(400).json({
@@ -44,14 +47,14 @@ class AuthController {
         });
       }
 
-      // 3. Hash password
+      // 4. Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // 4. Generate OTP and expiry
+      // 5. Generate OTP and expiry
       const otp = Math.floor(100000 + Math.random() * 900000);
       const otpExpire = Date.now() + 15 * 60 * 1000; // 15 mins
 
-      // 5. Create new user
+      // 6. Create new user
       const newUser = new Auth({
         name,
         email,
@@ -65,17 +68,17 @@ class AuthController {
 
       const savedUser = await newUser.save();
 
-      // 6. Send OTP email
+      // 7. Send OTP email
       await sendEmailVerificationOTP(req, savedUser);
 
-      // 7. Create token
+      // 8. Create token
       const token = jwt.sign(
         { id: savedUser._id, email: savedUser.email },
         process.env.JWT_SECRET || "your_secret_key",
         { expiresIn: "1d" }
       );
 
-      // 8. Return response
+      // 9. Return response
       return res.status(201).json({
         status: true,
         message: "User registered successfully. OTP sent for verification.",
@@ -96,20 +99,26 @@ class AuthController {
       });
     }
   }
-
   async authLogin(req, res) {
     try {
-      // ✅ Get email and password from body or query
-      const email = req.body?.email || req.query?.email;
-      const password = req.body?.password || req.query?.password;
+      // ✅ Determine if data comes from body or query
+      const isFromQuery = req.query?.email && req.query?.password;
+      const input = isFromQuery ? req.query : req.body;
 
-      // ✅ Validate input
-      if (!email || !password) {
+      // ✅ Validate input using Joi
+      const { error, value } = loginSchema.validate(input, {
+        abortEarly: false,
+      });
+
+      if (error) {
         return res.status(400).json({
           status: false,
-          message: "All fields (email, password) are required.",
+          message: "All fields are required",
+          errors: error.details.map((err) => err.message),
         });
       }
+
+      const { email, password } = value;
 
       // ✅ Check if user exists
       const existingUser = await Auth.findOne({ email });
@@ -162,16 +171,24 @@ class AuthController {
 
   async updatePassword(req, res) {
     try {
-      const { oldPassword, newPassword } = req.body || {};
       const userId = req?.user?.id;
 
-      if (!oldPassword || !newPassword) {
+      // ✅ Validate request body using Joi
+      const { error, value } = updatePasswordSchema.validate(req.body, {
+        abortEarly: false,
+      });
+
+      if (error) {
         return res.status(400).json({
           success: false,
-          message: "Both old and new password are required",
+          message: "Validation Error",
+          errors: error.details.map((err) => err.message),
         });
       }
 
+      const { oldPassword, newPassword } = value;
+
+      // ✅ Find user
       const user = await Auth.findById(userId);
 
       if (!user) {
@@ -181,8 +198,8 @@ class AuthController {
         });
       }
 
+      // ✅ Compare old password
       const isMatch = await bcrypt.compare(oldPassword, user.password);
-
       if (!isMatch) {
         return res.status(400).json({
           success: false,
@@ -190,9 +207,11 @@ class AuthController {
         });
       }
 
+      // ✅ Hash and update new password
       user.password = await bcrypt.hash(newPassword, 10);
       await user.save();
 
+      // ✅ Success response
       return res.status(200).json({
         success: true,
         message: "Password updated successfully",
@@ -229,100 +248,119 @@ class AuthController {
 
   async verifyOtp(req, res) {
     try {
-      const { email, otp } = req.body || {};
-
-      if (!email || !otp) {
-        return res
-          .status(400)
-          .json({ status: false, message: "All fields are required" });
-      }
-      const existingUser = await Auth.findOne({ email });
-
-      // Check if email doesn't exists
-      if (!existingUser) {
-        return res
-          .status(404)
-          .json({ status: "failed", message: "Email doesn't exists" });
-      }
-
-      // Check if email is already verified
-      if (existingUser.is_verified) {
-        return res
-          .status(400)
-          .json({ status: false, message: "Email is already verified" });
-      }
-      // Check if there is a matching email verification OTP
-      const emailVerification = await EmailVerifyModel.findOne({
-        userId: existingUser._id,
-        otp,
+      // ✅ Validate request body using Joi
+      const { error, value } = verifyOtpSchema.validate(req.body, {
+        abortEarly: false,
       });
-      if (!emailVerification) {
-        if (!existingUser.is_verified) {
-          // console.log(existingUser);
-          await sendEmailVerificationOTP(req, existingUser);
-          return res.status(400).json({
-            status: false,
-            message: "Invalid OTP, new OTP sent to your email",
-          });
-        }
-        return res.status(400).json({ status: false, message: "Invalid OTP" });
+
+      if (error) {
+        return res.status(400).json({
+          status: false,
+          message: "Validation Error",
+          errors: error.details.map((err) => err.message),
+        });
       }
-      // Check if OTP is expired
+
+      const { otp } = value;
+
+      // ✅ Find emailVerification entry using OTP
+      const emailVerification = await EmailVerifyModel.findOne({ otp });
+
+      if (!emailVerification) {
+        return res.status(400).json({
+          status: false,
+          message: "Invalid OTP, please request a new one.",
+        });
+      }
+
+      // ✅ Fetch user using userId from OTP entry
+      const existingUser = await Auth.findById(emailVerification.userId);
+
+      if (!existingUser) {
+        return res.status(404).json({
+          status: false,
+          message: "User not found",
+        });
+      }
+
+      if (existingUser.is_verified) {
+        return res.status(400).json({
+          status: false,
+          message: "Email already verified",
+        });
+      }
+
+      // ✅ Check OTP expiration
       const currentTime = new Date();
-      // 15 * 60 * 1000 calculates the expiration period in milliseconds(15 minutes).
       const expirationTime = new Date(
         emailVerification.createdAt.getTime() + 15 * 60 * 1000
       );
+
       if (currentTime > expirationTime) {
-        // OTP expired, send new OTP
+        await EmailVerifyModel.deleteMany({ userId: existingUser._id });
         await sendEmailVerificationOTP(req, existingUser);
         return res.status(400).json({
-          status: "failed",
-          message: "OTP expired, new OTP sent to your email",
+          status: false,
+          message: "OTP expired. A new one has been sent to your email.",
         });
       }
-      // OTP is valid and not expired, mark email as verified
+
+      // ✅ Mark user as verified
       existingUser.is_verified = true;
       await existingUser.save();
 
-      // Delete email verification document
+      // ✅ Cleanup
       await EmailVerifyModel.deleteMany({ userId: existingUser._id });
-      return res
-        .status(200)
-        .json({ status: true, message: "Email verified successfully" });
+
+      return res.status(200).json({
+        status: true,
+        message: "Email verified successfully",
+      });
     } catch (error) {
-      console.error(error);
-      res.status(500).json({
+      console.error("OTP verification error:", error);
+      return res.status(500).json({
         status: false,
-        message: "Unable to verify email, please try again later",
+        message: "Something went wrong. Please try again.",
       });
     }
   }
-
   async resetPasswordLink(req, res) {
     try {
-      const { email } = req.body;
-      if (!email) {
-        return res
-          .status(400)
-          .json({ status: false, message: "Email field is required" });
+      // ✅ Validate request body using Joi
+      const { error, value } = resetPasswordLinkSchema.validate(req.body, {
+        abortEarly: false,
+      });
+
+      if (error) {
+        return res.status(400).json({
+          status: false,
+          message: "Validation Error",
+          errors: error.details.map((err) => err.message),
+        });
       }
 
+      const { email } = value;
+
+      // ✅ Find user by email
       const user = await Auth.findOne({ email });
+
       if (!user) {
-        return res
-          .status(404)
-          .json({ status: false, message: "Email doesn't exist" });
+        return res.status(404).json({
+          status: false,
+          message: "Email doesn't exist",
+        });
       }
 
+      // ✅ Generate JWT token for password reset
       const secret = user._id + process.env.JWT_SECRET;
       const token = jwt.sign({ userID: user._id }, secret, {
         expiresIn: "20m",
       });
 
+      // ✅ Create reset link
       const resetLink = `${process.env.FRONTEND_HOST}/account/reset-password-confirm/${user._id}/${token}`;
 
-      // ✅ Define transporter here
+      // ✅ Configure transporter
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
@@ -331,7 +369,7 @@ class AuthController {
         },
       });
 
-      // ✅ Send email
+      // ✅ Send reset email
       await transporter.sendMail({
         from: process.env.SMTP_EMAIL,
         to: user.email,
@@ -339,12 +377,13 @@ class AuthController {
         html: `<p>Hello ${user.name},</p><p>Please <a href="${resetLink}">Click here</a> to reset your password.</p>`,
       });
 
+      // ✅ Success response
       return res.status(200).json({
         status: true,
         message: "Password reset email sent. Please check your email.",
       });
     } catch (error) {
-      console.log("Email send error:", error);
+      console.error("Reset password link error:", error);
       return res.status(500).json({
         status: false,
         message: "Unable to send password reset email. Please try again later.",
@@ -354,17 +393,33 @@ class AuthController {
 
   async resetPassword(req, res) {
     try {
-      const { password, confirm_password } = req.body || {};
       const { id, token } = req.params;
-      console.log(password, "password");
-      console.log(confirm_password, "password");
-      const user = await Auth.findById(id);
-      if (!user) {
-        return res
-          .status(400)
-          .json({ status: false, message: "User not found" });
+
+      // ✅ Validate request body using Joi
+      const { error, value } = resetPasswordSchema.validate(req.body, {
+        abortEarly: false,
+      });
+
+      if (error) {
+        return res.status(400).json({
+          status: false,
+          message: "Validation Error",
+          errors: error.details.map((err) => err.message),
+        });
       }
 
+      const { password, confirm_password } = value;
+
+      // ✅ Find user
+      const user = await Auth.findById(id);
+      if (!user) {
+        return res.status(404).json({
+          status: false,
+          message: "User not found",
+        });
+      }
+
+      // ✅ Verify JWT token
       const new_secret = user._id + process.env.JWT_SECRET;
       try {
         jwt.verify(token, new_secret);
@@ -375,13 +430,16 @@ class AuthController {
           message: "Invalid or expired token",
         });
       }
+
+      // ✅ Check password match
       if (password !== confirm_password) {
         return res.status(400).json({
           status: false,
-          message: "New Password and Confirm New Password don't match",
+          message: "New Password and Confirm New Password do not match",
         });
       }
 
+      // ✅ Hash and update password
       const salt = await bcrypt.genSalt(10);
       const newHashPassword = await bcrypt.hash(password, salt);
 
@@ -390,13 +448,13 @@ class AuthController {
       });
 
       return res.status(200).json({
-        status: "success",
+        status: true,
         message: "Password reset successfully",
       });
     } catch (error) {
       console.error("Reset password error:", error);
       return res.status(500).json({
-        status: "failed",
+        status: false,
         message: "Unable to reset password. Please try again later.",
       });
     }

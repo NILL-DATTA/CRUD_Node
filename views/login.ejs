@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login</title>
+
+    <!-- Bootstrap CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap @4.6.2/dist/css/bootstrap.min.css"
+    />
+
+    <!-- SweetAlert2 CSS (optional) -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/sweetalert2 @11/dist/sweetalert2.min.css"
+    />
+  </head>
+  <body>
+    <div class="container mt-5">
+      <h2 class="mb-4">Login</h2>
+
+      <form id="loginForm" action="/create/login" method="post">
+        <div class="form-group">
+          <label for="email">E-mail</label>
+          <input
+            type="text"
+            class="form-control"
+            name="email"
+            id="email"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input
+            type="password"
+            class="form-control"
+            name="password"
+            id="password"
+            required
+          />
+        </div>
+
+        <button type="submit" class="btn btn-primary">Login</button>
+      </form>
+    </div>
+
+    <!-- jQuery (required for AJAX if needed) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js "></script>
+
+    <!-- SweetAlert2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2 @11"></script>
+
+    <!-- Custom Script -->
+    <script>
+      // Optional: Show alert when page loads with success/error message (e.g., from server)
+      // For example, if backend sends something like ?success=true or ?error=invalid
+      const urlParams = new URLSearchParams(window.location.search);
+      const error = urlParams.get("error");
+      const success = urlParams.get("success");
+
+      if (success) {
+        Swal.fire({
+          icon: "success",
+          title: "Success!",
+          text: success,
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
+
+      if (error) {
+        Swal.fire({
+          icon: "error",
+          title: "Oops...",
+          text: error,
+          timer: 3000,
+          showConfirmButton: false,
+        });
+      }
+
+      // Optional: Confirm form submission with Swal
+      document
+        .getElementById("loginForm")
+        .addEventListener("submit", function (e) {
+          const email = document.getElementById("email").value.trim();
+          const password = document.getElementById("password").value;
+
+          if (!email || !password) {
+            e.preventDefault();
+            Swal.fire({
+              icon: "warning",
+              title: "Missing Fields",
+              text: "Please fill in both email and password.",
+              confirmButtonText: "OK",
+            });
+          }
+        });
+    </script>
+  </body>
+</html>

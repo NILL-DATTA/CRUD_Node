@@ -1,37 +1,65 @@
+const {
+  createPostSchema,
+  updatePostSchema,
+} = require("../../validators/postValidator");
 const Post = require("../model/postModel");
 
 class ApiController {
   //create student
   async createPost(req, res) {
-    // console.log(req.body);
-    //console.log('file image',req.file);
     try {
-      const { title, subtitle, content } = req.body;
+      // Validate request body
+      const { error, value } = createPostSchema.validate(req.body, {
+        abortEarly: false,
+      });
+
+      if (error) {
+        return res.status(400).json({
+          status: false,
+          message: "All fileds are required",
+          errors: error.details.map((err) => err.message),
+        });
+      }
+
+      const { title, subtitle, content } = value;
+      const userId = req.user.id;
+
       const data = new Post({
         title,
         subtitle,
         content,
+        userId,
       });
 
-      const sData = await data.save();
-      if (sData) {
-        return res.status(201).json({
-          status: true,
-          message: "Post created successfully",
-          data: sData,
-        });
-      }
+      const savedPost = await data.save();
+
+      return res.status(201).json({
+        status: true,
+        message: "Post created successfully",
+        data: savedPost,
+      });
     } catch (error) {
-      return res.status(400).json({
+      return res.status(500).json({
         status: false,
-        message: error.message,
+        message: error.message || "Internal Server Error",
       });
     }
   }
 
   async listPosts(req, res) {
+    console.log(req.user.id, "k");
     try {
-      const posts = await Post.find().sort({ createdAt: -1 });
+      const userId = req.user.id;
+
+      const posts = await Post.find({ userId }).sort({ createdAt: -1 });
+      if (posts.length === 0) {
+        return res.status(201).json({
+          status: true,
+          message: "No posts found for this user.",
+          data: [],
+        });
+      }
+
       return res.status(200).json({
         status: true,
         message: "Posts retrieved successfully",
@@ -44,26 +72,31 @@ class ApiController {
       });
     }
   }
-
   async updatePost(req, res) {
     try {
       const { id } = req.params;
-      const { title, subtitle, content } = req.body;
 
-      if (!id || !title || !subtitle || !content) {
+      if (!id) {
         return res.status(400).json({
           status: false,
-          message: "ID, title, subtitle, and content are required.",
+          message: "Post ID is required",
         });
       }
 
-      const updatedData = {
-        title,
-        subtitle,
-        content,
-      };
+      // Validate request body
+      const { error, value } = updatePostSchema.validate(req.body, {
+        abortEarly: false,
+      });
 
-      const updatedPost = await Post.findByIdAndUpdate(id, updatedData, {
+      if (error) {
+        return res.status(400).json({
+          status: false,
+          message: "All fileds are required",
+          errors: error.details.map((err) => err.message),
+        });
+      }
+
+      const updatedPost = await Post.findByIdAndUpdate(id, value, {
         new: true,
         runValidators: true,
       });
@@ -89,7 +122,6 @@ class ApiController {
       });
     }
   }
-
   async getPostById(req, res) {
     try {
       const { id } = req.params;

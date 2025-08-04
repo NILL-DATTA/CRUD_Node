@@ -21,25 +21,32 @@ class EjsApicontroller {
 
   async createPost(req, res) {
     try {
-      console.log(req.body);
+      const userId = req.session?.user?.id; // Get logged-in user ID from session
 
-      const user = new Post({
+      if (!userId) {
+        console.log("User not logged in");
+        return res.redirect("/user/login");
+      }
+
+      const post = new Post({
         title: req.body.title,
         subtitle: req.body.subtitle,
         content: req.body.content,
+        userId: userId, // Assign logged-in user's ID
       });
 
-      const result = await user.save();
+      const result = await post.save();
 
       if (result) {
         console.log("Content saved successfully:", result);
-        res.redirect("/posts");
+        return res.redirect("/posts");
       } else {
         console.log("Failed to save content.");
-        res.redirect("/add/post");
+        return res.redirect("/add/post");
       }
     } catch (err) {
       console.error("Error creating post:", err);
+      res.status(500).send("Server Error");
     }
   }
 
@@ -55,6 +62,7 @@ class EjsApicontroller {
       console.error("Error fetching post details:", err);
     }
   }
+
   async update(req, res) {
     try {
       const id = req.params.id;
