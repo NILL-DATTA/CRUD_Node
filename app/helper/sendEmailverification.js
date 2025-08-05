@@ -4,13 +4,11 @@ const otpVerifyModel = require("../model/otpModel");
 const sendEmailVerificationOTP = async (req, user) => {
   const otp = Math.floor(1000 + Math.random() * 9000);
 
-  // Save OTP in DB
   await new otpVerifyModel({
     userId: user._id,
     otp: otp,
   }).save();
 
-  // Send OTP via email
   await transporter.sendMail({
     from: process.env.SMTP_EMAIL,
     to: user.email,

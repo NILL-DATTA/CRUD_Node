@@ -67,7 +67,7 @@ class AuthController {
       });
 
       const savedUser = await newUser.save();
-
+ 
       // 7. Send OTP email
       await sendEmailVerificationOTP(req, savedUser);
 
