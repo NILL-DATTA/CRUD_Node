@@ -14,8 +14,8 @@ const limiter = rateLimit({
   legacyHeaders: false,
   message: "maximum limit hit",
 });
-const app = express();
 connectDB();
+const app = express();
 
 app.use(cors());
 app.use(morgan("combined"));
