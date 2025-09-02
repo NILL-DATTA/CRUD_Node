@@ -277,6 +277,7 @@ class AuthControllerEjs {
       });
     }
   }
+  
   async resetPassword(req, res) {
     const { id, token } = req.params;
 

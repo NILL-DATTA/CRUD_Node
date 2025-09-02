@@ -9,6 +9,8 @@ const {
   loginSchema,
   updatePasswordSchema,
   verifyOtpSchema,
+  resetPasswordSchema,
+  resetPasswordLinkSchema,
 } = require("../../validators/authValidator");
 class AuthController {
   // Register User
@@ -67,7 +69,7 @@ class AuthController {
       });
 
       const savedUser = await newUser.save();
- 
+
       // 7. Send OTP email
       await sendEmailVerificationOTP(req, savedUser);
 
@@ -99,6 +101,7 @@ class AuthController {
       });
     }
   }
+
   async authLogin(req, res) {
     try {
       // ✅ Determine if data comes from body or query

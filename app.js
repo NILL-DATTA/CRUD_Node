@@ -65,6 +65,9 @@ app.use(EjspostRoute);
 const EjsauthRoute = require("./app/router/authRouterEjs");
 app.use(EjsauthRoute);
 
+const AdminRoute = require("./app/router/adminRouter");
+app.use(AdminRoute);
+
 // Start server
 app.listen(4000, () => {
   console.log("Server is running at http://localhost:4000");
