@@ -361,7 +361,9 @@ class AuthController {
       });
 
       // ✅ Create reset link
-      const resetLink = `${process.env.FRONTEND_HOST}/auth/reset-password/${user._id}/${token}`;
+      const resetLink = `${`http://localhost:3000`}/auth/reset-password/${
+        user._id
+      }/${token}`;
 
       // ✅ Configure transporter
       const transporter = nodemailer.createTransport({
