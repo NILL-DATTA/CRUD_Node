@@ -1,21 +1,21 @@
-import nodemailer from "nodemailer";
+// utils/sendOtpEmail.js
+import { Resend } from "resend";
 import dotenv from "dotenv";
 dotenv.config();
 
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+/**
+ * Send OTP Email via Resend API
+ * @param {string} to - Receiver email
+ * @param {number} otp - OTP code
+ */
 export const sendOtpEmail = async (to, otp) => {
   try {
-    const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: process.env.EMAIL_PORT,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: process.env.SMTP_EMAIL,
-        pass: process.env.SMTP_PASSWORD,
-      },
-    });
+    console.log(`📧 Sending OTP to: ${to} Code: ${otp}`);
 
-    const mailOptions = {
-      from: `"YourApp" <${process.env.SMTP_EMAIL}>`,
+    const response = await resend.emails.send({
+      from: "YourApp <onboarding@resend.dev>", // or your verified domain email
       to,
       subject: "Your OTP Code",
       html: `
@@ -26,10 +26,13 @@ export const sendOtpEmail = async (to, otp) => {
           <p>This code will expire in 5 minutes.</p>
         </div>
       `,
-    };
+    });
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log("✅ OTP Email sent successfully:", info.response);
+    if (response.error) {
+      console.error("❌ Resend API Error:", response.error);
+    } else {
+      console.log("✅ Email sent successfully:", response);
+    }
   } catch (error) {
     console.error("❌ Error sending OTP email:", error);
   }
