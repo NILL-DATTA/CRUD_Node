@@ -5,6 +5,9 @@ const router = express.Router();
 const upload = require("../../middlware/middleware");
 const verifyToken = require("../../middlware/authMiddleware");
 
+
+
+
 router.post(
   "/register",
   upload.single("profileImage"),

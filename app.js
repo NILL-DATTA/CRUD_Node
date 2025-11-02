@@ -7,35 +7,38 @@ const cors = require("cors");
 const morgan = require("morgan");
 const session = require("express-session");
 
-const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  limit: 10,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: "maximum limit hit",
-});
+// ------------------- MongoDB Connect -------------------
 connectDB();
+
+// ------------------- Initialize App -------------------
 const app = express();
 
+// ------------------- Middleware -------------------
 app.use(cors());
 app.use(morgan("combined"));
 
+// ✅ Rate Limiter (optional)
+const limiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  limit: 10,
+  message: "Maximum limit hit. Please wait a minute.",
+});
 app.use(limiter);
 
-// Body parsers
+// ✅ Body Parsers
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Sessions for EJS login
+// ✅ Sessions (use env secret)
 app.use(
   session({
-    secret: "JWT_SECRET",
+    secret: process.env.JWT_SECRET || "fallback_secret",
     resave: false,
     saveUninitialized: false,
   })
 );
 
-// Set req.user from session
+// ✅ Attach session user if present
 app.use((req, res, next) => {
   if (req.session && req.session.user) {
     req.user = req.session.user;
@@ -43,22 +46,20 @@ app.use((req, res, next) => {
   next();
 });
 
-// Set view engine
+// ------------------- Views & Static Files -------------------
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
-
-// Static folder
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static("uploads"));
 
-// API Routes
+// ------------------- API Routes -------------------
 const postRoute = require("./app/router/postRouter");
 app.use("/api", postRoute);
 
 const authRoute = require("./app/router/authRouter");
 app.use("/auth", authRoute);
 
-// EJS Routes
+// ------------------- EJS Routes -------------------
 const EjspostRoute = require("./app/router/postRouterEjs");
 app.use(EjspostRoute);
 
@@ -68,7 +69,20 @@ app.use(EjsauthRoute);
 const AdminRoute = require("./app/router/adminRouter");
 app.use(AdminRoute);
 
-// Start server
-app.listen(4000, () => {
-  console.log("Server is running at http://localhost:4000");
+// ------------------- Default Route -------------------
+app.get("/", (req, res) => {
+  res.json({ message: "🚀 API is live and running on Render!" });
+});
+
+// ------------------- Error Handling -------------------
+app.use((err, req, res, next) => {
+  console.error("❌ Error:", err.message);
+  res.status(500).json({ status: false, message: "Server error. Please try again later." });
+});
+
+// ------------------- Start Server -------------------
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => {
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log("✅ MongoDB URI Found:", process.env.MONGO_URI ? "Yes" : "No");
 });
