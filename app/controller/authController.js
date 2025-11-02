@@ -12,11 +12,12 @@ const {
   resetPasswordSchema,
   resetPasswordLinkSchema,
 } = require("../../validators/authValidator");
+const { sendOtpEmail } = require("../../utils/mailService");
 class AuthController {
   // Register User
   async authRegister(req, res) {
     try {
-      // 1. Validate request body using Joi
+      // 1️⃣ Validate incoming data
       const { error, value } = registerSchema.validate(req.body, {
         abortEarly: false,
       });
@@ -24,23 +25,14 @@ class AuthController {
       if (error) {
         return res.status(400).json({
           status: false,
-          message: "All fields are require",
+          message: "Validation failed",
           errors: error.details.map((err) => err.message),
         });
       }
 
       const { name, email, password, address } = value;
 
-      // 2. Check if profile image was uploaded
-      const profileImage = req.file;
-      if (!profileImage) {
-        return res.status(400).json({
-          status: false,
-          message: "Profile image is required.",
-        });
-      }
-
-      // 3. Check for existing user
+      // 2️⃣ Check if user already exists
       const existingUser = await Auth.findOne({ email });
       if (existingUser) {
         return res.status(400).json({
@@ -49,19 +41,22 @@ class AuthController {
         });
       }
 
-      // 4. Hash password
+      // 3️⃣ Optional: Handle profile image
+      const profileImage = req.file ? req.file.path : "";
+
+      // 4️⃣ Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // 5. Generate OTP and expiry
+      // 5️⃣ Generate OTP & expiry time
       const otp = Math.floor(100000 + Math.random() * 900000);
-      const otpExpire = Date.now() + 15 * 60 * 1000; // 15 mins
+      const otpExpire = Date.now() + 5 * 60 * 1000; // 5 minutes expiry
 
-      // 6. Create new user
+      // 6️⃣ Create and save new user
       const newUser = new Auth({
         name,
         email,
         address,
-        imagePath: profileImage.path,
+        imagePath: profileImage,
         password: hashedPassword,
         verifyOtp: otp,
         verifyOtpExpire: otpExpire,
@@ -70,20 +65,20 @@ class AuthController {
 
       const savedUser = await newUser.save();
 
-      // 7. Send OTP email
-      await sendEmailVerificationOTP(req, savedUser);
+      // 7️⃣ Send OTP via email (using Resend)
+      await sendOtpEmail(email, otp);
 
-      // 8. Create token
+      // 8️⃣ Generate JWT token
       const token = jwt.sign(
         { id: savedUser._id, email: savedUser.email },
-        process.env.JWT_SECRET || "your_secret_key",
+        process.env.JWT_SECRET,
         { expiresIn: "1d" }
       );
 
-      // 9. Return response
+      // 9️⃣ Return success response
       return res.status(201).json({
         status: true,
-        message: "User registered successfully. OTP sent for verification.",
+        message: "User registered successfully. OTP sent to email.",
         user: {
           id: savedUser._id,
           name: savedUser.name,
@@ -94,10 +89,11 @@ class AuthController {
         token,
       });
     } catch (error) {
-      console.error("Registration error:", error);
+      console.error("❌ Registration error:", error);
       return res.status(500).json({
         status: false,
         message: "Server error. Please try again later.",
+        error: error.message,
       });
     }
   }
@@ -464,6 +460,5 @@ class AuthController {
       });
     }
   }
-  
 }
 module.exports = new AuthController();
