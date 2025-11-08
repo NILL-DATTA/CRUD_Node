@@ -1,55 +1,56 @@
-// helper/sendEmailVerificationOTP.js
-const sgMail = require("@sendgrid/mail");
-const otpVerifyModel = require("../model/otpModel");
-require("dotenv").config();
+const nodemailer = require("nodemailer");
+const EmailVerifyOTP = require("../model/otpModel");
 
-// Set SendGrid API key
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-
-/**
- * Generate OTP, save to DB, and send email via SendGrid
- * @param {Object} user - User object { _id, name, email }
- * @param {number} otpLength - Optional OTP length (default 6)
- * @returns {number} otp - Generated OTP
- */
-const sendEmailVerificationOTP = async (user, otpLength = 6) => {
+const sendEmailVerificationOTP = async (user) => {
   try {
-    // 1️⃣ Generate OTP
-    const otp = Math.floor(
-      Math.pow(10, otpLength - 1) + Math.random() * 9 * Math.pow(10, otpLength - 1)
-    );
+    if (!user || !user._id || !user.email) {
+      throw new Error("Invalid user object");
+    }
 
-    // 2️⃣ Save OTP to DB
-    await new otpVerifyModel({
-      userId: user._id,
-      otp: otp,
-      createdAt: new Date(),               // optional
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 min expiry
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+
+    // Remove old OTPs
+    await EmailVerifyOTP.deleteMany({ userId: user._id.toString() });
+
+    console.log("➡️ Saving OTP for user:", user._id.toString());
+    const saved = await new EmailVerifyOTP({
+      userId: user._id.toString(),
+      otp,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
     }).save();
+    console.log("✅ OTP Saved:", saved);
+    console.log("📌 OTP saved in DB:", saved);
 
-    // 3️⃣ Prepare email
-    const msg = {
+    // Nodemailer transporter
+    const transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST,
+      port: Number(process.env.EMAIL_PORT) || 465,
+      secure: true,
+      auth: {
+        user: process.env.SMTP_EMAIL,
+        pass: process.env.SMTP_PASSWORD,
+      },
+    });
+
+    const mailOptions = {
+      from: `"YourApp" <${process.env.SMTP_EMAIL}>`,
       to: user.email,
-      from: process.env.SMTP_EMAIL, // verified sender in SendGrid
-      subject: "OTP - Verify your account",
+      subject: "Your OTP Code",
       html: `
-        <p>Dear ${user.name},</p>
-        <p>Thank you for signing up. Your OTP is:</p>
+        <p>Hello ${user.name},</p>
+        <p>Your OTP code is:</p>
         <h2>${otp}</h2>
         <p>This OTP is valid for 15 minutes.</p>
-        <p>If you didn’t request this, please ignore this email.</p>
       `,
     };
 
-    // 4️⃣ Send OTP email
-    await sgMail.send(msg);
-    console.log("✅ OTP email sent to", user.email);
+    await transporter.sendMail(mailOptions);
+    console.log("✅ OTP Email sent to:", user.email);
 
-    // 5️⃣ Return OTP
-    return otp;
+    return saved; // saved document with OTP
   } catch (error) {
-    console.error("❌ Error sending OTP email:", error);
-    throw new Error("Failed to send OTP email");
+    console.error("❌ OTP sending failed:", error);
+    throw error;
   }
 };
 

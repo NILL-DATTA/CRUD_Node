@@ -53,15 +53,21 @@ const updatePasswordSchema = Joi.object({
 });
 
 const verifyOtpSchema = Joi.object({
+  userId: Joi.string().trim().required().messages({
+    "string.empty": `User ID cannot be empty`,
+    "any.required": `User ID is required`,
+  }),
+
   otp: Joi.string()
-    .length(4)
-    .pattern(/^[0-9]+$/)
+    .trim()
+    .length(6)
+    .pattern(/^\d{6}$/)
     .required()
     .messages({
-      "string.empty": `"otp" cannot be empty`,
-      "any.required": `"otp" is required`,
-      "string.length": `"otp" must be exactly {#limit} characters long`,
-      "string.pattern.base": `"otp" must contain only numbers`,
+      "string.empty": `OTP cannot be empty`,
+      "any.required": `OTP is required`,
+      "string.length": `OTP must be exactly 6 digits`,
+      "string.pattern.base": `OTP must contain only numbers`,
     }),
 });
 

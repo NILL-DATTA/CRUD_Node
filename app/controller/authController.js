@@ -1,7 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const Auth = require("../model/authModel");
-const EmailVerifyModel = require("../model/otpModel");
+const EmailVerifyOTP = require("../model/otpModel");
 const sendEmailVerificationOTP = require("../helper/sendEmailverification");
 const nodemailer = require("nodemailer");
 const {
@@ -12,12 +12,12 @@ const {
   resetPasswordSchema,
   resetPasswordLinkSchema,
 } = require("../../validators/authValidator");
-const { sendOtpEmail } = require("../../utils/mailService");
+
+const { keep } = require("../../validators/adminSchema");
 class AuthController {
   // Register User
-  async authRegister(req, res) {
+async authRegister(req, res) {
     try {
-      // 1️⃣ Validate incoming data
       const { error, value } = registerSchema.validate(req.body, {
         abortEarly: false,
       });
@@ -32,7 +32,6 @@ class AuthController {
 
       const { name, email, password, address } = value;
 
-      // 2️⃣ Check if user already exists
       const existingUser = await Auth.findOne({ email });
       if (existingUser) {
         return res.status(400).json({
@@ -41,53 +40,42 @@ class AuthController {
         });
       }
 
-      // 3️⃣ Optional: Handle profile image
       const profileImage = req.file ? req.file.path : "";
-
-      // 4️⃣ Hash password
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // 5️⃣ Generate OTP & expiry time
-      const otp = Math.floor(100000 + Math.random() * 900000);
-      const otpExpire = Date.now() + 5 * 60 * 1000; // 5 minutes expiry
-
-      // 6️⃣ Create and save new user
-      const newUser = new Auth({
+      // ✅ Create User (NO OTP HERE)
+      const newUser = await Auth.create({
         name,
         email,
         address,
         imagePath: profileImage,
         password: hashedPassword,
-        verifyOtp: otp,
-        verifyOtpExpire: otpExpire,
-        isVerified: false,
+        is_verified: false,
       });
 
-      const savedUser = await newUser.save();
+      // ✅ Send + Save OTP using shared function
+      await sendEmailVerificationOTP(newUser);
 
-      // 7️⃣ Send OTP via email (using Resend)
-      await sendOtpEmail(email, otp);
-
-      // 8️⃣ Generate JWT token
+      // ✅ Generate token
       const token = jwt.sign(
-        { id: savedUser._id, email: savedUser.email },
+        { id: newUser._id, email: newUser.email },
         process.env.JWT_SECRET,
         { expiresIn: "1d" }
       );
 
-      // 9️⃣ Return success response
       return res.status(201).json({
         status: true,
         message: "User registered successfully. OTP sent to email.",
         user: {
-          id: savedUser._id,
-          name: savedUser.name,
-          email: savedUser.email,
-          address: savedUser.address,
-          imagePath: savedUser.imagePath,
+          id: newUser._id,
+          name: newUser.name,
+          email: newUser.email,
+          address: newUser.address,
+          imagePath: newUser.imagePath,
         },
         token,
       });
+
     } catch (error) {
       console.error("❌ Registration error:", error);
       return res.status(500).json({
@@ -97,6 +85,7 @@ class AuthController {
       });
     }
   }
+
 
   async authLogin(req, res) {
     try {
@@ -247,7 +236,6 @@ class AuthController {
 
   async verifyOtp(req, res) {
     try {
-      // ✅ Validate request body using Joi
       const { error, value } = verifyOtpSchema.validate(req.body, {
         abortEarly: false,
       });
@@ -256,15 +244,23 @@ class AuthController {
         return res.status(400).json({
           status: false,
           message: "Validation Error",
-          errors: error.details.map((err) => err.message),
+          errors: error.details.map((e) => e.message),
         });
       }
 
-      const { otp } = value;
+      const { userId, otp } = value;
 
-      // ✅ Find emailVerification entry using OTP
-      const emailVerification = await EmailVerifyModel.findOne({ otp });
+      const emailVerification = await EmailVerifyOTP.findOne({
+        userId,
+        otp: String(otp),
+      });
 
+      // const check = await EmailVerifyOTP.find();
+      // console.log("All OTP Entries in DB:", check);
+
+      console.log("Client Sent OTP:", otp);
+      console.log("DB Found OTP Entry:", emailVerification);
+      console.log("userId:", userId);
       if (!emailVerification) {
         return res.status(400).json({
           status: false,
@@ -272,14 +268,11 @@ class AuthController {
         });
       }
 
-      // ✅ Fetch user using userId from OTP entry
-      const existingUser = await Auth.findById(emailVerification.userId);
-
+      const existingUser = await Auth.findById(userId);
       if (!existingUser) {
-        return res.status(404).json({
-          status: false,
-          message: "User not found",
-        });
+        return res
+          .status(404)
+          .json({ status: false, message: "User not found" });
       }
 
       if (existingUser.is_verified) {
@@ -289,27 +282,19 @@ class AuthController {
         });
       }
 
-      // ✅ Check OTP expiration
-      const currentTime = new Date();
-      const expirationTime = new Date(
-        emailVerification.createdAt.getTime() + 15 * 60 * 1000
-      );
-
-      if (currentTime > expirationTime) {
-        await EmailVerifyModel.deleteMany({ userId: existingUser._id });
-        await sendEmailVerificationOTP(req, existingUser);
+      if (new Date() > emailVerification.expiresAt) {
+        await EmailVerifyOTP.deleteMany({ userId });
+        await sendEmailVerificationOTP(existingUser);
         return res.status(400).json({
           status: false,
-          message: "OTP expired. A new one has been sent to your email.",
+          message: "OTP expired. A new OTP has been sent to your email.",
         });
       }
 
-      // ✅ Mark user as verified
       existingUser.is_verified = true;
       await existingUser.save();
 
-      // ✅ Cleanup
-      await EmailVerifyModel.deleteMany({ userId: existingUser._id });
+      await EmailVerifyOTP.deleteMany({ userId });
 
       return res.status(200).json({
         status: true,
@@ -323,6 +308,7 @@ class AuthController {
       });
     }
   }
+
   async resetPasswordLink(req, res) {
     try {
       // ✅ Validate request body using Joi
