@@ -23,17 +23,17 @@ const sendEmailVerificationOTP = async (user) => {
 
     // Nodemailer transporter
     const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: Number(process.env.EMAIL_PORT) || 465,
+      host: process.env.EMAIL_HOST || "smtp.gmail.com",
+      port: Number(process.env.EMAIL_PORT) || 587,
       secure: true,
       auth: {
-        user: process.env.SMTP_EMAIL,
-        pass: process.env.SMTP_PASSWORD,
+        user: process.env.SMTP_EMAIL||"sagnikduttaimps@gmail.com",
+        pass: process.env.SMTP_PASSWORD||"pqzp nzoo qgpj wlie",
       },
     });
 
     const mailOptions = {
-      from: `"YourApp" <${process.env.SMTP_EMAIL}>`,
+      from: `"YourApp" <${process.env.SMTP_EMAIL||"sagnikduttaimps@gmail.com"}>`,
       to: user.email,
       subject: "Your OTP Code",
       html: `
