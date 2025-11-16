@@ -24,7 +24,7 @@ const sendEmailVerificationOTP = async (user) => {
     // Nodemailer transporter
     const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || "smtp.gmail.com",
-      port: Number(process.env.EMAIL_PORT) || 587,
+      port: Number(process.env.EMAIL_PORT) || 465,
       secure: true,
       auth: {
         user: process.env.SMTP_EMAIL||"sagnikduttaimps@gmail.com",
