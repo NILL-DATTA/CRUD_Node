@@ -35,7 +35,7 @@ app.use(
     secret: process.env.JWT_SECRET || "fallback_secret",
     resave: false,
     saveUninitialized: false,
-  })
+  }),
 );
 
 // ✅ Attach session user if present
@@ -77,11 +77,13 @@ app.get("/", (req, res) => {
 // ------------------- Error Handling -------------------
 app.use((err, req, res, next) => {
   console.error("❌ Error:", err.message);
-  res.status(500).json({ status: false, message: "Server error. Please try again later." });
+  res
+    .status(500)
+    .json({ status: false, message: "Server error. Please try again later." });
 });
 
 // ------------------- Start Server -------------------
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log("✅ MongoDB URI Found:", process.env.MONGO_URI ? "Yes" : "No");

@@ -16,7 +16,7 @@ const {
 const { keep } = require("../../validators/adminSchema");
 class AuthController {
   // Register User
-async authRegister(req, res) {
+  async authRegister(req, res) {
     try {
       const { error, value } = registerSchema.validate(req.body, {
         abortEarly: false,
@@ -60,7 +60,7 @@ async authRegister(req, res) {
       const token = jwt.sign(
         { id: newUser._id, email: newUser.email },
         process.env.JWT_SECRET,
-        { expiresIn: "1d" }
+        { expiresIn: "1d" },
       );
 
       return res.status(201).json({
@@ -75,7 +75,6 @@ async authRegister(req, res) {
         },
         token,
       });
-
     } catch (error) {
       console.error("❌ Registration error:", error);
       return res.status(500).json({
@@ -85,7 +84,6 @@ async authRegister(req, res) {
       });
     }
   }
-
 
   async authLogin(req, res) {
     try {
@@ -134,7 +132,7 @@ async authRegister(req, res) {
           name: existingUser.name,
         },
         process.env.JWT_SECRET || "your_secret_key",
-        { expiresIn: "1d" }
+        { expiresIn: "1d" },
       );
 
       // ✅ Send success response
@@ -254,9 +252,6 @@ async authRegister(req, res) {
         userId,
         otp: String(otp),
       });
-
-      // const check = await EmailVerifyOTP.find();
-      // console.log("All OTP Entries in DB:", check);
 
       console.log("Client Sent OTP:", otp);
       console.log("DB Found OTP Entry:", emailVerification);

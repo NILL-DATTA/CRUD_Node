@@ -5,13 +5,10 @@ const router = express.Router();
 const upload = require("../../middlware/middleware");
 const verifyToken = require("../../middlware/authMiddleware");
 
-
-
-
 router.post(
   "/register",
   upload.single("profileImage"),
-  AuthController.authRegister
+  AuthController.authRegister,
 );
 router.post("/login", AuthController.authLogin);
 router.put("/update-password", verifyToken, AuthController.updatePassword);

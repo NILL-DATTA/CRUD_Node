@@ -27,13 +27,13 @@ const sendEmailVerificationOTP = async (user) => {
       port: Number(process.env.EMAIL_PORT) || 465,
       secure: true,
       auth: {
-        user: process.env.SMTP_EMAIL||"sagnikduttaimps@gmail.com",
-        pass: process.env.SMTP_PASSWORD||"pqzp nzoo qgpj wlie",
+        user: process.env.SMTP_EMAIL || "sagnikduttaimps@gmail.com",
+        pass: process.env.SMTP_PASSWORD || "pqzp nzoo qgpj wlie",
       },
     });
 
     const mailOptions = {
-      from: `"YourApp" <${process.env.SMTP_EMAIL||"sagnikduttaimps@gmail.com"}>`,
+      from: `"YourApp" <${process.env.SMTP_EMAIL || "sagnikduttaimps@gmail.com"}>`,
       to: user.email,
       subject: "Your OTP Code",
       html: `

@@ -4,7 +4,9 @@ const connectDB = async () => {
   try {
     const uri = process.env.MONGO_URI;
     if (!uri) {
-      console.log("⚠️ No MONGO_URI found in .env — please check Render environment variables.");
+      console.log(
+        "⚠️ No MONGO_URI found in .env — please check Render environment variables.",
+      );
       return;
     }
 
@@ -16,5 +18,3 @@ const connectDB = async () => {
 };
 
 module.exports = connectDB;
-
-
